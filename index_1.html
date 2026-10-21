@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mapa de actores: deepfakes electorales</title>
+<meta name="description" content="Mapa interactivo de actores y flujos de información en el ecosistema de deepfakes e IA generativa en las elecciones latinoamericanas.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: cabecera breve, mapa a ancho completo con panel lateral de detalle, y lectura crítica debajo. Paleta clara única. */
+:root {
+  color-scheme: light;
+  --bg: #F6F8FB;
+  --surface: #FFFFFF;
+  --ink: #26314A;
+  --muted: #66718A;
+  --line: #DCE2EC;
+  --soft: #EEF2F8;
+  --accent: #4F7BD9;
+  --accent-soft: #E6EEFC;
+  --display: "Sora", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 48px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 24px; }
+h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; line-height: 1.15; color: var(--ink); }
+h1 { font-size: clamp(1.7rem, 3.6vw, 2.6rem); font-weight: 700; letter-spacing: -0.015em; }
+h2 { font-size: clamp(1.3rem, 2.4vw, 1.7rem); font-weight: 600; }
+h3 { font-size: 1.05rem; font-weight: 600; }
+p { margin: 0; max-width: 70ch; }
+.eyebrow { font-family: var(--mono); font-size: .75rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+header { padding-block: 32px 0; display: grid; gap: 12px; }
+header .lede { font-size: 1.08rem; color: var(--muted); }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.toolbar .label { font-size: .85rem; color: var(--muted); margin-right: 4px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 12px; font-size: .9rem; }
+.chip .sw { width: 22px; height: 0; border-top: 3px solid; }
+.chip[aria-pressed="false"] { opacity: .45; }
+.chip[aria-pressed="false"] .sw { border-top-color: var(--line) !important; }
+.toggle { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 5px 12px; font-size: .9rem; }
+.toggle[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+.mapbox { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; min-width: 0; }
+.mapbox svg { display: block; width: 100%; min-width: 860px; height: auto; }
+.hint { font-size: .85rem; color: var(--muted); padding: 10px 14px; border-top: 1px solid var(--line); min-width: 860px; }
+
+.node rect { stroke-width: 1.6; transition: opacity .2s; }
+.node text { font-family: var(--body); font-size: 14px; fill: var(--ink); font-weight: 600; pointer-events: none; }
+.node .note { font-weight: 400; font-style: italic; font-size: 11.5px; fill: var(--muted); }
+.node { cursor: pointer; transition: opacity .2s; }
+.node:hover rect { filter: brightness(.97); }
+.node:focus { outline: none; }
+.node:focus-visible rect:not(.pulse) { stroke: var(--accent); stroke-width: 3; }
+.node.sel rect { stroke-width: 3; }
+.node.critical rect { stroke-width: 3; }
+.edge path.line { fill: none; transition: opacity .2s, stroke-width .2s; }
+.edge path.hit { fill: none; stroke: transparent; stroke-width: 14; cursor: pointer; }
+.edge text { font-family: var(--body); font-size: 11.5px; fill: var(--muted); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; pointer-events: none; }
+svg.focus .node:not(.lit) { opacity: .22; }
+svg.focus .edge:not(.lit) { opacity: .08; }
+svg.nolabels .edge text { display: none; }
+svg.focus .edge.lit text { display: block; }
+.pulse { fill: none; stroke-width: 2; opacity: .0; }
+svg.crit .pulse { animation: pulse 1.8s ease-out infinite; }
+@keyframes pulse { 0% { opacity: .7; } 100% { opacity: 0; transform: scale(1.12); } }
+
+aside.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 12px; position: sticky; top: max(12px, env(safe-area-inset-top, 0px)); min-width: 0; }
+.badge { display: inline-block; font-family: var(--mono); font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; border: 1px solid; justify-self: start; }
+.flows { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: .92rem; }
+.flows li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; }
+.flows .dot { width: 10px; height: 10px; border-radius: 50%; transform: translateY(1px); }
+.flows .k { font-family: var(--mono); font-size: .78rem; color: var(--muted); }
+.panel .sub { font-family: var(--mono); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.panel .critnote { background: #FFF4E8; border: 1px solid #F3C99A; border-radius: 6px; padding: 8px 10px; font-size: .92rem; }
+.clear { justify-self: start; border: 1px solid var(--line); background: var(--soft); border-radius: 6px; padding: 5px 12px; font-size: .9rem; }
+
+.tip { position: fixed; pointer-events: none; background: var(--ink); color: #fff; font-size: .85rem; padding: 6px 10px; border-radius: 6px; max-width: 280px; z-index: 20; line-height: 1.35; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: .88rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 16px; height: 12px; border-radius: 3px; border: 1.5px solid; display: inline-block; }
+
+section.read { display: grid; gap: 16px; }
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 8px; align-content: start; }
+.card .eyebrow { color: var(--accent); }
+.method { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 8px; }
+footer { font-size: .85rem; color: var(--muted); display: grid; gap: 8px; }
+footer ol { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+footer a { color: var(--accent); }
+
+@media (max-width: 960px) {
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  aside.panel { position: static; }
+}
+@media (max-width: 640px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Ética e Innovación en la Era Digital · Unidad 1 · Actividad 2</span>
+    <h1>Mapa de actores y flujos de información: deepfakes e IA generativa en las elecciones latinoamericanas</h1>
+    <p class="lede">17 actores y 30 flujos que muestran quién fabrica, amplifica, recibe y controla el contenido sintético en los procesos electorales de la región. Toque un actor para ver sus relaciones, o filtre por tipo de flujo.</p>
+  </header>
+
+  <div class="toolbar" id="filters" aria-label="Filtrar por tipo de flujo"><span class="label">Flujos:</span></div>
+  <div class="toolbar">
+    <span class="label">Vista:</span>
+    <button class="toggle" id="tLabels" aria-pressed="false">Etiquetas de flujo</button>
+    <button class="toggle" id="tCrit" aria-pressed="false">Resaltar puntos críticos</button>
+  </div>
+
+  <div class="stage">
+    <div class="mapbox">
+      <svg id="map" class="nolabels" viewBox="0 0 1120 760" role="img" aria-label="Mapa de actores y flujos de información"></svg>
+      <div class="hint">El grosor de cada flecha indica la intensidad del flujo o del poder ejercido, de 1 a 5. En el celular, deslice el mapa hacia los lados.</div>
+    </div>
+    <aside class="panel" id="panel" aria-live="polite"></aside>
+  </div>
+
+  <div class="legend" id="legend" aria-label="Tipos de actor"></div>
+
+  <section class="read">
+    <span class="eyebrow">Lectura crítica</span>
+    <h2>Lo que revela el mapa</h2>
+    <div class="cards">
+      <article class="card"><span class="eyebrow">Poder</span><h3>Las plataformas y sus algoritmos concentran el control</h3><p>Los algoritmos de recomendación reciben casi todos los contenidos y las señales de interacción, y deciden qué se amplifica. Son los programadores y conmutadores de la red que describe Castells. Del lado de la producción, los operadores anónimos reciben el flujo más grueso de capacidad técnica y actúan fuera del alcance regulatorio, como los individuos soberanos de Davidson y Rees-Mogg.</p></article>
+      <article class="card"><span class="eyebrow">Puntos ciegos</span><h3>Lo que circula sin dejar rastro</h3><p>La mensajería cifrada transporta algunos de los flujos más intensos sin trazabilidad pública ni moderación. La academia tiene acceso restringido a los datos de las plataformas, y los flujos regulatorios son los más delgados del mapa.</p></article>
+      <article class="card"><span class="eyebrow">Sesgos</span><h3>La amplificación llega a quienes menos verifican</h3><p>Los votantes con baja alfabetización o acceso limitado reciben la mayor amplificación y el menor alcance de la verificación: la segunda brecha digital se vuelve vulnerabilidad electoral. El mapa también tiene sesgos propios: se basa en fuentes públicas, sus intensidades son estimaciones y no puede ver dentro de los canales cifrados.</p></article>
+      <article class="card"><span class="eyebrow">Implicaciones éticas</span><h3>Quien tiene más poder rinde menos cuentas</h3><p>La voz y el rostro de las candidaturas se extraen sin consentimiento. Desde los derechos digitales, el mapa señala dónde intervenir: transparencia de los algoritmos, fricción al reenvío masivo, verificación dirigida a las poblaciones más expuestas y autoridades de datos con capacidad real.</p></article>
+    </div>
+    <div class="method">
+      <span class="eyebrow">Metodología</span>
+      <p>Los actores se identificaron a partir de la lectura de la Unidad 1 y de reportes de incidentes de la OCDE y la Fundación Friedrich Naumann sobre las elecciones de Argentina (2023) y México (2024). Se clasificaron en seis tipos y sus relaciones en seis tipos de flujo, con una intensidad cualitativa de 1 a 5 asignada por juicio analítico. La versión estática se elaboró con Graphviz y esta versión interactiva con HTML, SVG y JavaScript.</p>
+    </div>
+  </section>
+
+  <footer>
+    <p><strong>Autor:</strong> Martín Gracia Socha. Especialización en Diseño y Creación con Inteligencia Artificial, Fundación Universidad de Bogotá Jorge Tadeo Lozano, 2026.</p>
+    <ol>
+      <li>Castells, M. (2000). <em>La era de la información: Economía, sociedad y cultura: Vol. 1. La sociedad red</em> (2.ª ed.). Alianza Editorial.</li>
+      <li>Davidson, J. D. y Rees-Mogg, W. (2022). <em>El individuo soberano</em>. Bubok Publishing.</li>
+      <li>Gordo López, Á. J., García Arnau, A., de Rivera Outomuro, J. y Díaz-Catalán, C. (2018). <em>Jóvenes en la encrucijada digital</em>. Ediciones Morata.</li>
+      <li>OECD.AI. (2023). <em>AI-generated deepfakes manipulate Argentine presidential election</em>. <a href="https://oecd.ai/en/incidents/2023-11-14-1e5d">oecd.ai/en/incidents/2023-11-14-1e5d</a></li>
+      <li>OECD.AI. (2024). <em>Claudia Sheinbaum warns of AI deepfake video used in investment scam</em>. <a href="https://oecd.ai/en/incidents/2024-01-24-7824">oecd.ai/en/incidents/2024-01-24-7824</a></li>
+      <li>Salcedo, M. J. (2025). <em>AI and its influence in Mexico’s 2024 elections</em>. Fundación Friedrich Naumann. <a href="https://www.freiheit.org/mexico/ai-and-its-influence-mexicos-2024-elections">freiheit.org</a></li>
+    </ol>
+  </footer>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+var G = {"groups": {"prod": {"name": "Productores de contenido", "fill": "#FDEDEA", "stroke": "#D9786B"}, "tec": {"name": "Infraestructura de IA", "fill": "#FFF4DC", "stroke": "#D4A03A"}, "plat": {"name": "Plataformas", "fill": "#E9F2FD", "stroke": "#6A9BD8"}, "ciud": {"name": "Ciudadanía y afectados", "fill": "#F3F5F8", "stroke": "#98A2B3"}, "cont": {"name": "Contrapesos cívicos", "fill": "#E7F7F3", "stroke": "#5DB8A3"}, "est": {"name": "Estado y regulación", "fill": "#F2EEFB", "stroke": "#9A88D1"}}, "nodes": [{"id": "P1", "label": "Campañas y consultoras políticas", "lines": ["Campañas y", "consultoras políticas"], "group": "prod", "note": "", "x": 5.4, "y": 8.6, "noteLines": []}, {"id": "P2", "label": "Operadores anónimos y granjas de cuentas", "lines": ["Operadores anónimos y", "granjas de cuentas"], "group": "prod", "note": "«individuos soberanos»", "x": 5.4, "y": 6.4, "noteLines": ["«individuos soberanos»"]}, {"id": "P3", "label": "Actores estatales extranjeros", "lines": ["Actores estatales", "extranjeros"], "group": "prod", "note": "injerencia informativa", "x": 5.4, "y": 4.2, "noteLines": ["injerencia informativa"]}, {"id": "P4", "label": "Redes de fraude", "lines": ["Redes de fraude"], "group": "prod", "note": "", "x": 5.4, "y": 2.0, "noteLines": []}, {"id": "T1", "label": "Desarrolladores de modelos generativos", "lines": ["Desarrolladores de", "modelos generativos"], "group": "tec", "note": "", "x": 1.6, "y": 6.0, "noteLines": []}, {"id": "T2", "label": "Algoritmos de recomendación", "lines": ["Algoritmos de", "recomendación"], "group": "tec", "note": "CUELLO DE BOTELLA: decide la visibilidad", "x": 14.2, "y": 7.6, "noteLines": ["CUELLO DE BOTELLA:", "decide la visibilidad"]}, {"id": "L1", "label": "Redes sociales y video (Meta, TikTok, YouTube, X)", "lines": ["Redes sociales y video", "(Meta, TikTok, YouTube, X)"], "group": "plat", "note": "", "x": 10.0, "y": 7.6, "noteLines": []}, {"id": "L2", "label": "Mensajería cifrada (WhatsApp, Telegram)", "lines": ["Mensajería cifrada", "(WhatsApp, Telegram)"], "group": "plat", "note": "PUNTO CIEGO: sin trazabilidad pública", "x": 10.0, "y": 3.4, "noteLines": ["PUNTO CIEGO:", "sin trazabilidad pública"]}, {"id": "C1", "label": "Candidaturas suplantadas", "lines": ["Candidaturas", "suplantadas"], "group": "ciud", "note": "", "x": 1.6, "y": 2.2, "noteLines": []}, {"id": "C2", "label": "Votantes con alta alfabetización digital", "lines": ["Votantes con alta", "alfabetización digital"], "group": "ciud", "note": "", "x": 18.4, "y": 8.4, "noteLines": []}, {"id": "C3", "label": "Votantes con baja alfabetización o acceso limitado", "lines": ["Votantes con baja", "alfabetización o", "acceso limitado"], "group": "ciud", "note": "brechas de uso y acceso", "x": 18.4, "y": 4.6, "noteLines": ["brechas de uso y acceso"]}, {"id": "K1", "label": "Verificadores y medios", "lines": ["Verificadores y", "medios"], "group": "cont", "note": "", "x": 14.2, "y": 3.4, "noteLines": []}, {"id": "K2", "label": "Academia y observatorios", "lines": ["Academia y", "observatorios"], "group": "cont", "note": "", "x": 14.2, "y": 0.8, "noteLines": []}, {"id": "E1", "label": "Autoridades electorales (INE, TSE, CNE)", "lines": ["Autoridades electorales", "(INE, TSE, CNE)"], "group": "est", "note": "", "x": 5.4, "y": -1.6, "noteLines": []}, {"id": "E2", "label": "Autoridades de protección de datos", "lines": ["Autoridades de", "protección de datos"], "group": "est", "note": "baja capacidad sancionatoria", "x": 14.2, "y": -1.6, "noteLines": ["baja capacidad sancionatoria"]}, {"id": "E3", "label": "Legisladores", "lines": ["Legisladores"], "group": "est", "note": "", "x": 10.0, "y": -1.6, "noteLines": []}, {"id": "E4", "label": "Equipos de respuesta a incidentes (CSIRT)", "lines": ["Equipos de respuesta", "a incidentes (CSIRT)"], "group": "est", "note": "", "x": 1.6, "y": -1.6, "noteLines": []}], "flows": {"contenido": {"name": "Contenido sintético y desinformación", "color": "#E2725F", "style": "solid"}, "capacidad": {"name": "Capacidad técnica de síntesis", "color": "#E7A93E", "style": "solid"}, "datos": {"name": "Datos personales y de comportamiento", "color": "#A58AD8", "style": "solid"}, "dinero": {"name": "Dinero y pauta publicitaria", "color": "#5BB98A", "style": "solid"}, "regula": {"name": "Regulación y supervisión", "color": "#6B93D6", "style": "dashed"}, "verifica": {"name": "Verificación y evidencia", "color": "#3FB3A1", "style": "dotted"}}, "edges": [{"from": "T1", "to": "P1", "type": "capacidad", "k": 3, "label": ""}, {"from": "T1", "to": "P2", "type": "capacidad", "k": 5, "label": ""}, {"from": "T1", "to": "P3", "type": "capacidad", "k": 4, "label": ""}, {"from": "T1", "to": "P4", "type": "capacidad", "k": 4, "label": ""}, {"from": "C1", "to": "P2", "type": "datos", "k": 4, "label": "voz e imagen extraídas"}, {"from": "C1", "to": "P1", "type": "datos", "k": 2, "label": ""}, {"from": "P1", "to": "P2", "type": "dinero", "k": 3, "label": "contratación"}, {"from": "P1", "to": "L1", "type": "dinero", "k": 3, "label": "pauta segmentada"}, {"from": "P1", "to": "L1", "type": "contenido", "k": 3, "label": ""}, {"from": "P2", "to": "L1", "type": "contenido", "k": 4, "label": ""}, {"from": "P2", "to": "L2", "type": "contenido", "k": 5, "label": "audios y videos falsos"}, {"from": "P3", "to": "L1", "type": "contenido", "k": 3, "label": ""}, {"from": "P4", "to": "L2", "type": "contenido", "k": 3, "label": ""}, {"from": "L1", "to": "T2", "type": "datos", "k": 5, "label": "señales de interacción"}, {"from": "T2", "to": "C2", "type": "contenido", "k": 3, "label": ""}, {"from": "T2", "to": "C3", "type": "contenido", "k": 5, "label": "amplificación"}, {"from": "L2", "to": "C3", "type": "contenido", "k": 5, "label": "reenvío masivo"}, {"from": "L2", "to": "C2", "type": "contenido", "k": 2, "label": ""}, {"from": "C2", "to": "L1", "type": "datos", "k": 3, "label": ""}, {"from": "C3", "to": "L1", "type": "datos", "k": 4, "label": "datos de comportamiento"}, {"from": "C3", "to": "P4", "type": "dinero", "k": 2, "label": "pérdidas por fraude"}, {"from": "E3", "to": "E1", "type": "regula", "k": 2, "label": "mandatos"}, {"from": "E1", "to": "P1", "type": "regula", "k": 3, "label": ""}, {"from": "E1", "to": "L1", "type": "regula", "k": 2, "label": "acuerdos voluntarios"}, {"from": "E2", "to": "L1", "type": "regula", "k": 1, "label": "supervisión limitada"}, {"from": "E4", "to": "E1", "type": "verifica", "k": 2, "label": "alertas de incidentes"}, {"from": "L1", "to": "K2", "type": "datos", "k": 1, "label": "acceso restringido"}, {"from": "K2", "to": "E3", "type": "verifica", "k": 1, "label": "evidencia"}, {"from": "K1", "to": "C2", "type": "verifica", "k": 3, "label": ""}, {"from": "K1", "to": "C3", "type": "verifica", "k": 1, "label": "alcance bajo"}]};
+var INFO = {
+  P1: "Contratan producción de contenido y pauta segmentada. En Argentina (2023), las dos campañas presidenciales difundieron imágenes y videos generados con IA.",
+  P2: "Fabrican y distribuyen audios y videos falsos con herramientas de bajo costo, desde jurisdicciones lejanas y con anonimato. Encarnan la tesis del individuo soberano.",
+  P3: "Usan la IA generativa para abaratar operaciones de manipulación e injerencia informativa extranjera.",
+  P4: "Usan la imagen de candidaturas para estafas, como el video falso de Claudia Sheinbaum que promovía una inversión en 2024.",
+  T1: "Controlan la capacidad misma de fabricar voces e imágenes verosímiles. Sus salvaguardas son voluntarias.",
+  T2: "Deciden qué contenido gana visibilidad y están optimizados para maximizar la interacción. Son los programadores y conmutadores de la red.",
+  L1: "Concentran contenido, datos de comportamiento y pauta. Su moderación depende de acuerdos voluntarios con las autoridades.",
+  L2: "Transportan reenvíos masivos de persona a persona, sin trazabilidad pública ni moderación.",
+  C1: "Su voz y su imagen, disponibles en discursos y entrevistas, se extraen sin consentimiento para fabricar contenido falso.",
+  C2: "Reciben más verificación y tienen habilidades para contrastar fuentes.",
+  C3: "Reciben la mayor amplificación y el menor alcance de la verificación. Aquí la segunda brecha digital se vuelve vulnerabilidad electoral.",
+  K1: "Desmienten contenidos falsos, pero su alcance entre los votantes más expuestos es bajo.",
+  K2: "Producen evidencia para legisladores, con acceso restringido a los datos de las plataformas.",
+  E1: "Fijan reglas de propaganda, como la prohibición de deepfakes del Tribunal Superior Eleitoral de Brasil en 2024, y dependen de acuerdos voluntarios con las plataformas.",
+  E2: "Tienen baja capacidad para supervisar y sancionar a corporaciones globales.",
+  E3: "Emiten mandatos que avanzan más despacio que el fenómeno.",
+  E4: "Alertan sobre incidentes, aunque la ciberseguridad electoral se ha centrado en la infraestructura y no en la manipulación de la información."
+};
+var CRIT = { T2: "Cuello de botella: una decisión de diseño sobre qué se recomienda pesa más que cualquier desmentido posterior.", L2: "Punto ciego: algunos de los flujos más intensos circulan aquí sin que nadie pueda auditarlos." };
+
+var NS = "http://www.w3.org/2000/svg";
+var svg = document.getElementById("map");
+var W = 1120, H = 760, NW = 190, NH = 52;
+var byId = {}; G.nodes.forEach(function (n) { byId[n.id] = n; });
+// Coordenadas: x en pulgadas (1.6 a 18.4), y en pulgadas (-1.6 a 8.6, hacia arriba)
+function px(n) { return 100 + (n.x - 1.6) * ((W - 200) / 16.8); }
+function py(n) { return 60 + (8.6 - n.y) * ((H - 120) / 10.2); }
+G.nodes.forEach(function (n) { n.cx = px(n); n.cy = py(n); n.h = Math.max(NH, 16 * (n.lines.length + (n.noteLines || []).length) + 16); });
+
+function el(tag, attrs, parent) { var e = document.createElementNS(NS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+
+var defs = el("defs", {}, svg);
+Object.keys(G.flows).forEach(function (k) {
+  var m = el("marker", { id: "ar-" + k, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "11", markerHeight: "11", orient: "auto-start-reverse", markerUnits: "userSpaceOnUse" }, defs);
+  el("path", { d: "M0,0 L10,5 L0,10 z", fill: G.flows[k].color }, m);
+});
+var gEdges = el("g", {}, svg), gNodes = el("g", {}, svg);
+
+function boxPoint(n, tx, ty) {
+  var dx = tx - n.cx, dy = ty - n.cy, hw = NW / 2 + 4, hh = (n.h || NH) / 2 + 4;
+  var s = Math.min(hw / Math.abs(dx || 1e-6), hh / Math.abs(dy || 1e-6));
+  return [n.cx + dx * s, n.cy + dy * s];
+}
+var pairCount = {};
+G.edges.forEach(function (e, i) {
+  var a = byId[e.from], b = byId[e.to], f = G.flows[e.type];
+  var key = [e.from, e.to].sort().join("-"); pairCount[key] = (pairCount[key] || 0) + 1;
+  var bend = (pairCount[key] === 1 ? 0.12 : -0.16);
+  var p1 = boxPoint(a, b.cx, b.cy), p2 = boxPoint(b, a.cx, a.cy);
+  var mx = (p1[0] + p2[0]) / 2, my = (p1[1] + p2[1]) / 2, dx = p2[0] - p1[0], dy = p2[1] - p1[1];
+  var cx = mx - dy * bend, cy = my + dx * bend;
+  var d = "M" + p1[0].toFixed(1) + "," + p1[1].toFixed(1) + " Q" + cx.toFixed(1) + "," + cy.toFixed(1) + " " + p2[0].toFixed(1) + "," + p2[1].toFixed(1);
+  var g = el("g", { "class": "edge", "data-type": e.type, "data-i": i }, gEdges);
+  el("path", { "class": "line", d: d, stroke: f.color, "stroke-width": (0.9 + 0.9 * (e.k - 1)).toFixed(1), "stroke-dasharray": f.style === "dashed" ? "7 5" : f.style === "dotted" ? "2 4" : "", "stroke-linecap": "round", "marker-end": "url(#ar-" + e.type + ")" }, g);
+  var hit = el("path", { "class": "hit", d: d }, g);
+  if (e.label) {
+    var lx = 0.25 * p1[0] + 0.5 * cx + 0.25 * p2[0], ly = 0.25 * p1[1] + 0.5 * cy + 0.25 * p2[1];
+    var t = el("text", { x: lx.toFixed(1), y: (ly - 4).toFixed(1), "text-anchor": "middle" }, g); t.textContent = e.label;
+  }
+  e.g = g;
+  hit.addEventListener("mousemove", function (ev) { showTip(ev, a.label + " → " + b.label + "<br>" + f.name + " · intensidad " + e.k + "/5" + (e.label ? "<br><em>" + e.label + "</em>" : "")); });
+  hit.addEventListener("mouseleave", hideTip);
+});
+
+G.nodes.forEach(function (n) {
+  var grp = G.groups[n.group];
+  var g = el("g", { "class": "node", tabindex: "0", role: "button", "aria-label": n.label, "data-id": n.id }, gNodes);
+  if (CRIT[n.id]) { g.classList.add("critical"); var nhp = Math.max(NH, 16 * (n.lines.length + (n.noteLines||[]).length) + 16); el("rect", { "class": "pulse", x: n.cx - NW / 2 - 6, y: n.cy - nhp / 2 - 6, width: NW + 12, height: nhp + 12, rx: 12, stroke: "#E39A4C", style: "transform-origin:" + n.cx + "px " + n.cy + "px" }, g); }
+  el("rect", { x: n.cx - NW / 2, y: n.cy - n.h / 2, width: NW, height: n.h, rx: 9, fill: grp.fill, stroke: grp.stroke }, g);
+  var lines = n.lines.slice(); var notes = n.noteLines || []; var total = lines.length + notes.length;
+    var y0 = n.cy - (total - 1) * 8 + 5;
+  lines.forEach(function (ln, i) { var t = el("text", { x: n.cx, y: y0 + i * 16, "text-anchor": "middle" }, g); t.textContent = ln; });
+  notes.forEach(function (ln, i) { var t = el("text", { "class": "note", x: n.cx, y: y0 + (lines.length + i) * 16, "text-anchor": "middle" }, g); t.textContent = ln; });
+  n.g = g;
+  g.addEventListener("click", function () { select(n.id); });
+  g.addEventListener("keydown", function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); select(n.id); } });
+});
+
+// Tooltip
+var tip = document.getElementById("tip");
+function showTip(ev, html) { tip.innerHTML = html; tip.hidden = false; tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 300) + "px"; tip.style.top = (ev.clientY + 14) + "px"; }
+function hideTip() { tip.hidden = true; }
+
+// Filtros
+var active = {}; Object.keys(G.flows).forEach(function (k) { active[k] = true; });
+var filters = document.getElementById("filters");
+Object.keys(G.flows).forEach(function (k) {
+  var f = G.flows[k];
+  var b = document.createElement("button"); b.className = "chip"; b.id = "f-" + k; b.setAttribute("aria-pressed", "true");
+  b.innerHTML = '<span class="sw" style="border-top-color:' + f.color + ';border-top-style:' + (f.style === "solid" ? "solid" : f.style) + '"></span>' + f.name;
+  b.addEventListener("click", function () { active[k] = !active[k]; b.setAttribute("aria-pressed", active[k]); applyFilters(); });
+  filters.appendChild(b);
+});
+function applyFilters() { G.edges.forEach(function (e) { e.g.style.display = active[e.type] ? "" : "none"; }); }
+
+// Leyenda de actores
+var legend = document.getElementById("legend");
+Object.keys(G.groups).forEach(function (k) { var g = G.groups[k]; var s = document.createElement("span"); s.innerHTML = '<i style="background:' + g.fill + ';border-color:' + g.stroke + '"></i>' + g.name; legend.appendChild(s); });
+
+// Vistas
+var tLabels = document.getElementById("tLabels"), tCrit = document.getElementById("tCrit");
+tLabels.addEventListener("click", function () { var on = tLabels.getAttribute("aria-pressed") !== "true"; tLabels.setAttribute("aria-pressed", on); svg.classList.toggle("nolabels", !on); });
+tCrit.addEventListener("click", function () { var on = tCrit.getAttribute("aria-pressed") !== "true"; tCrit.setAttribute("aria-pressed", on); svg.classList.toggle("crit", on); if (on) panelCrit(); });
+
+// Panel
+var panel = document.getElementById("panel"), selected = null;
+function flowItem(e, other) { var f = G.flows[e.type]; return '<li><span class="dot" style="background:' + f.color + '"></span><span>' + other + ' <span class="muted">· ' + f.name.toLowerCase() + '</span></span><span class="k">' + e.k + '/5</span></li>'; }
+function panelDefault() {
+  panel.innerHTML = '<span class="sub">Cómo leer el mapa</span><h3>Seleccione un actor</h3><p>Al tocar un actor se resaltan solo sus flujos, y aquí verá qué recibe, qué envía y con qué intensidad.</p><p class="muted">Los dos actores con borde grueso son los puntos críticos del sistema: el cuello de botella y el punto ciego.</p><p class="muted">Sugerencia: empiece por los algoritmos de recomendación o por la mensajería cifrada.</p>';
+}
+function panelCrit() {
+  if (selected) return;
+  panel.innerHTML = '<span class="sub">Puntos críticos</span><h3>Dónde se concentra el riesgo</h3><p class="critnote"><strong>Algoritmos de recomendación.</strong> ' + CRIT.T2 + '</p><p class="critnote"><strong>Mensajería cifrada.</strong> ' + CRIT.L2 + '</p>';
+}
+function select(id) {
+  if (selected === id) { clearSel(); return; }
+  selected = id; var n = byId[id], grp = G.groups[n.group];
+  svg.classList.add("focus");
+  G.nodes.forEach(function (m) { m.g.classList.remove("lit", "sel"); });
+  G.edges.forEach(function (e) { e.g.classList.remove("lit"); });
+  n.g.classList.add("lit", "sel");
+  var ins = [], outs = [];
+  G.edges.forEach(function (e) {
+    if (e.from === id || e.to === id) { e.g.classList.add("lit"); byId[e.from].g.classList.add("lit"); byId[e.to].g.classList.add("lit"); }
+    if (e.to === id) ins.push(flowItem(e, byId[e.from].label));
+    if (e.from === id) outs.push(flowItem(e, byId[e.to].label));
+  });
+  panel.innerHTML = '<span class="badge" style="background:' + grp.fill + ';border-color:' + grp.stroke + '">' + grp.name + '</span><h3>' + n.label + '</h3><p>' + INFO[id] + '</p>' +
+    (CRIT[id] ? '<p class="critnote">' + CRIT[id] + '</p>' : '') +
+    '<span class="sub">Recibe de (' + ins.length + ')</span><ul class="flows">' + (ins.join("") || '<li><span></span><span class="muted">Ningún flujo entrante</span><span></span></li>') + '</ul>' +
+    '<span class="sub">Envía a (' + outs.length + ')</span><ul class="flows">' + (outs.join("") || '<li><span></span><span class="muted">Ningún flujo saliente</span><span></span></li>') + '</ul>' +
+    '<button class="clear" id="clearSel">Ver todo el mapa</button>';
+  document.getElementById("clearSel").addEventListener("click", clearSel);
+}
+function clearSel() { selected = null; svg.classList.remove("focus"); G.nodes.forEach(function (m) { m.g.classList.remove("lit", "sel"); }); G.edges.forEach(function (e) { e.g.classList.remove("lit"); }); if (tCrit.getAttribute("aria-pressed") === "true") panelCrit(); else panelDefault(); }
+panelDefault();
+</script>
+</body>
+</html>
